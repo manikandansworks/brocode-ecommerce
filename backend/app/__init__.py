@@ -3,15 +3,30 @@ from functools import wraps
 import os
 
 import jwt
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import check_password_hash, generate_password_hash
 
 
 def create_app():
     app = Flask(__name__)
-    CORS(app)
-    app.config["SECRET_KEY"] = os.getenv("JWT_SECRET", "change-this-brocode-secret")
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+    allowed_origins = os.getenv("CORS_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173").split(",")
+    CORS(app, origins=[origin.strip() for origin in allowed_origins if origin.strip()])
+    jwt_secret = os.getenv("JWT_SECRET")
+    if not jwt_secret and os.getenv("FLASK_ENV") == "production":
+        raise RuntimeError("JWT_SECRET must be configured in production.")
+    app.config["SECRET_KEY"] = jwt_secret or "dev-only-brocode-secret"
+
+    @app.before_request
+    def force_https():
+        if os.getenv("FORCE_HTTPS", "false").lower() != "true":
+            return None
+        forwarded_proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+        if forwarded_proto != "https":
+            return redirect(request.url.replace("http://", "https://", 1), code=308)
+        return None
 
     def db():
         import mysql.connector

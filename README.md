@@ -49,4 +49,23 @@ $env:MYSQL_USER="root"
 $env:MYSQL_PASSWORD="your_password"
 $env:MYSQL_DATABASE="brocode_store"
 $env:JWT_SECRET="replace_me"
+$env:FORCE_HTTPS="true"
+$env:CORS_ORIGINS="https://manikandansworks.github.io"
 ```
+
+For the frontend, configure deployment variables without committing them:
+
+```powershell
+$env:VITE_API_URL="https://your-api.example.com"
+$env:VITE_GA_MEASUREMENT_ID="G-XXXXXXXXXX"
+```
+
+`VITE_API_URL` connects customer/admin forms to the Flask API. `VITE_GA_MEASUREMENT_ID`
+enables analytics only after cookie consent. GitHub Pages hosts the static frontend;
+the Flask API and MySQL database must be deployed separately.
+
+## GitHub Pages
+
+The repository includes `.github/workflows/deploy-pages.yml`. In the repository
+settings, set **Pages > Build and deployment > Source** to **GitHub Actions**.
+Every push to `main` then builds and publishes `frontend/dist`.

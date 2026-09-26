@@ -1,4 +1,4 @@
-const img = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=900&q=85`;
+const img = (id) => `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=800&q=75`;
 
 export const categories = [
   { name: 'Shirts', icon: 'SH' },

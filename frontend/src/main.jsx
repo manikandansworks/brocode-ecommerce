@@ -1,10 +1,76 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
 import logoAsset from './assets/brocode-logo.svg';
 import { products as seedProducts, categories as seedCategories, blogs as seedBlogs, reviews, orders as seedOrders, customers } from './data/storeData';
 
 const logoFallback = logoAsset;
+const siteUrl = 'https://manikandansworks.github.io/brocode-ecommerce/';
+const apiBase = import.meta.env.VITE_API_URL || '';
+
+function apiUrl(path) {
+  return `${apiBase}${path}`;
+}
+
+function Honeypot() {
+  return <input className="honeypot" name="website" tabIndex="-1" autoComplete="off" aria-hidden="true" />;
+}
+
+function usePageSeo(page, product) {
+  useEffect(() => {
+    const title = product ? `${product.name} | Brocode` : {
+      home: 'Brocode Clothing | Premium Streetwear',
+      shop: 'Shop Streetwear | Brocode Clothing',
+      blogs: 'Brocode Journal | Style Guides and Trends',
+      about: 'About Brocode | Everyday Streetwear',
+      contact: 'Contact Brocode Clothing',
+      login: 'Login | Brocode Clothing',
+      admin: 'Owner Dashboard | Brocode',
+      wishlist: 'Wishlist | Brocode Clothing',
+      cart: 'Shopping Cart | Brocode Clothing',
+      checkout: 'Checkout | Brocode Clothing',
+      privacy: 'Privacy Policy | Brocode Clothing',
+      terms: 'Terms and Conditions | Brocode Clothing'
+    }[page] || 'Brocode Clothing';
+    const description = product?.description || 'Shop premium streetwear, oversized tees, jackets, hoodies and everyday fits from Brocode Clothing.';
+    document.title = title;
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:title"]')?.setAttribute('content', title);
+    document.querySelector('meta[property="og:description"]')?.setAttribute('content', description);
+    document.querySelector('meta[property="og:url"]')?.setAttribute('content', siteUrl);
+  }, [page, product]);
+}
+
+function useAnalytics(consent) {
+  useEffect(() => {
+    const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID;
+    if (consent !== 'accepted' || !measurementId || document.getElementById('brocode-analytics')) return;
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = (...args) => window.dataLayer.push(args);
+    window.gtag('js', new Date());
+    window.gtag('config', measurementId, { anonymize_ip: true });
+    const script = document.createElement('script');
+    script.id = 'brocode-analytics';
+    script.async = true;
+    script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+    document.head.appendChild(script);
+  }, [consent]);
+}
+
+function CookieBanner({ onChoice }) {
+  return (
+    <aside className="cookie-banner" role="dialog" aria-label="Cookie preferences">
+      <div>
+        <strong>Cookie preferences</strong>
+        <p>We use essential storage for your cart and preferences. Optional analytics load only after you accept.</p>
+      </div>
+      <div className="cookie-actions">
+        <button onClick={() => onChoice('declined')}>Decline optional</button>
+        <button className="primary" onClick={() => onChoice('accepted')}>Accept analytics</button>
+      </div>
+    </aside>
+  );
+}
 
 function money(value) {
   return `₹${value.toLocaleString('en-IN')}`;
@@ -60,6 +126,33 @@ function ProductCard({ product, onOpen, onCart, onWish, wished }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function Newsletter() {
+  const [status, setStatus] = useState('');
+
+  function submit(event) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    if (data.get('website')) return;
+    setStatus('Thanks. You are on the Brocode drop list.');
+    event.currentTarget.reset();
+  }
+
+  return (
+    <section className="newsletter">
+      <div>
+        <h2>Get first access to limited Brocode drops.</h2>
+        {status && <p className="form-success" role="status">{status}</p>}
+      </div>
+      <form onSubmit={submit}>
+        <Honeypot />
+        <label className="sr-only" htmlFor="newsletter-email">Email address</label>
+        <input id="newsletter-email" name="email" type="email" placeholder="Email address" required />
+        <button className="primary" type="submit">Subscribe</button>
+      </form>
+    </section>
   );
 }
 
@@ -120,13 +213,7 @@ function Home({ catalog, categoryList, setPage, setSelected, addCart, toggleWish
         ))}
       </section>
 
-      <section className="newsletter">
-        <h2>Get first access to limited Brocode drops.</h2>
-        <form>
-          <input type="email" placeholder="Email address" />
-          <button className="primary">Subscribe</button>
-        </form>
-      </section>
+      <Newsletter />
     </>
   );
 }
@@ -201,7 +288,7 @@ function ProductDetails({ product, catalog, addCart, setPage, setSelected }) {
     <main className="details-page">
       <div className="details-media">
         <img className="main-product" src={image} alt={product.name} />
-        <div className="thumbs">{product.images.map((img) => <button key={img} onClick={() => setImage(img)}><img src={img} alt="" /></button>)}</div>
+        <div className="thumbs">{product.images.map((img, index) => <button key={img} onClick={() => setImage(img)} aria-label={`View ${product.name} image ${index + 1}`}><img src={img} alt={`${product.name} view ${index + 1}`} /></button>)}</div>
       </div>
       <div className="details-copy">
         <p>{product.brand} / {product.category}</p>
@@ -258,44 +345,87 @@ function Cart({ cart, setCart, setPage }) {
 
 function Checkout({ cart }) {
   const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const [payment, setPayment] = useState('Cash on Delivery');
+  const [status, setStatus] = useState('');
+
+  function placeOrder(event) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    if (data.get('website')) return;
+    setStatus(`Demo order ready with ${payment}. Connect the payment gateway before accepting live orders.`);
+  }
+
   return (
     <main className="checkout">
-      <section className="form-panel">
+      <form className="form-panel" onSubmit={placeOrder}>
         <h1>Checkout</h1>
-        <input placeholder="Full name" />
-        <input placeholder="Phone number" />
-        <input placeholder="Street address" />
-        <div className="split"><input placeholder="City" /><input placeholder="PIN code" /></div>
+        <Honeypot />
+        <label>Full name<input name="name" placeholder="Full name" autoComplete="name" required /></label>
+        <label>Phone number<input name="phone" type="tel" placeholder="Phone number" autoComplete="tel" pattern="[0-9 +()-]{8,}" required /></label>
+        <label>Street address<input name="address" placeholder="Street address" autoComplete="street-address" required /></label>
+        <div className="split"><label>City<input name="city" placeholder="City" autoComplete="address-level2" required /></label><label>PIN code<input name="pin" inputMode="numeric" pattern="[0-9]{5,6}" placeholder="PIN code" autoComplete="postal-code" required /></label></div>
         <h3>Payment Method</h3>
-        <div className="payment-methods">{['UPI', 'Credit/Debit Card', 'Cash on Delivery'].map((m) => <button key={m}>{m}</button>)}</div>
-      </section>
+        <div className="payment-methods">{['UPI', 'Credit/Debit Card', 'Cash on Delivery'].map((m) => <button type="button" className={payment === m ? 'selected' : ''} key={m} onClick={() => setPayment(m)}>{m}</button>)}</div>
+        {status && <p className="form-success" role="status">{status}</p>}
+        <button className="primary large" type="submit">Place Order</button>
+      </form>
       <aside className="summary">
         <h2>Order Summary</h2>
         {cart.map((item) => <div key={item.id}><span>{item.name} x {item.qty}</span><strong>{money(item.price * item.qty)}</strong></div>)}
         <div><span>Total</span><strong>{money(total)}</strong></div>
-        <button className="primary large">Place Order</button>
       </aside>
     </main>
   );
 }
 
 function Login() {
+  const [loginStatus, setLoginStatus] = useState('');
+  const [signupStatus, setSignupStatus] = useState('');
+
+  async function login(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (data.website) return;
+    if (!apiBase) {
+      setLoginStatus('Customer authentication is not connected in this preview.');
+      return;
+    }
+    try {
+      const response = await fetch(apiUrl('/api/auth/login'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const result = await response.json();
+      setLoginStatus(response.ok ? 'Logged in successfully.' : result.error || 'Unable to log in.');
+    } catch {
+      setLoginStatus('Authentication service is unavailable.');
+    }
+  }
+
+  function signup(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (data.website) return;
+    setSignupStatus(apiBase ? 'Account creation is ready for the connected API.' : 'Account creation is available after the API is connected.');
+  }
+
   return (
     <main className="auth-page">
-      <section className="auth-card">
+      <form className="auth-card" onSubmit={login}>
         <h1>Welcome Back</h1>
-        <input type="email" placeholder="Email address" />
-        <input type="password" placeholder="Password" />
-        <button className="primary large">Login</button>
-        <button>Forgot Password?</button>
-      </section>
-      <section className="auth-card dark-card">
+        <Honeypot />
+        <label>Email address<input name="email" type="email" placeholder="Email address" autoComplete="email" required /></label>
+        <label>Password<input name="password" type="password" placeholder="Password" autoComplete="current-password" minLength="8" required /></label>
+        {loginStatus && <p className="form-status" role="status">{loginStatus}</p>}
+        <button className="primary large" type="submit">Login</button>
+        <button type="button" onClick={() => setLoginStatus('Password reset will be sent by the connected API.')}>Forgot Password?</button>
+      </form>
+      <form className="auth-card dark-card" onSubmit={signup}>
         <h1>Create Account</h1>
-        <input placeholder="Full name" />
-        <input type="email" placeholder="Email address" />
-        <input type="password" placeholder="Password" />
-        <button className="primary large">Sign Up</button>
-      </section>
+        <Honeypot />
+        <label>Full name<input name="name" placeholder="Full name" autoComplete="name" required /></label>
+        <label>Email address<input name="email" type="email" placeholder="Email address" autoComplete="email" required /></label>
+        <label>Password<input name="password" type="password" placeholder="Password" autoComplete="new-password" minLength="8" required /></label>
+        {signupStatus && <p className="form-status" role="status">{signupStatus}</p>}
+        <button className="primary large" type="submit">Sign Up</button>
+      </form>
     </main>
   );
 }
@@ -313,15 +443,35 @@ function About() {
 }
 
 function Contact() {
+  const [status, setStatus] = useState('');
+
+  async function submit(event) {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (data.website) return;
+    if (!apiBase) {
+      setStatus('Message validated. Connect the API to deliver it to the Brocode inbox.');
+      return;
+    }
+    try {
+      const response = await fetch(apiUrl('/api/contact'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      setStatus(response.ok ? 'Message sent. We will get back to you soon.' : 'Unable to send the message right now.');
+    } catch {
+      setStatus('Contact service is unavailable.');
+    }
+  }
+
   return (
     <main className="contact-page">
-      <section className="form-panel">
+      <form className="form-panel" onSubmit={submit}>
         <h1>Contact Us</h1>
-        <input placeholder="Name" />
-        <input placeholder="Email" />
-        <textarea placeholder="Message" />
-        <button className="primary large">Send Message</button>
-      </section>
+        <Honeypot />
+        <label>Name<input name="name" placeholder="Name" autoComplete="name" required /></label>
+        <label>Email<input name="email" type="email" placeholder="Email" autoComplete="email" required /></label>
+        <label>Message<textarea name="message" placeholder="Message" minLength="10" required /></label>
+        {status && <p className="form-status" role="status">{status}</p>}
+        <button className="primary large" type="submit">Send Message</button>
+      </form>
       <aside className="contact-info">
         <h2>Brocode HQ</h2>
         <p>Phone: +91 98765 43210</p>
@@ -340,6 +490,38 @@ function Blogs({ blogList }) {
       <div className="blog-grid">
         {blogList.map((blog) => <article key={blog.title}><img src={blog.image} alt={blog.title} /><p>{blog.tag}</p><h3>{blog.title}</h3><span>{blog.excerpt}</span></article>)}
       </div>
+    </main>
+  );
+}
+
+function PrivacyPolicy() {
+  return (
+    <main className="content-page legal-page">
+      <p className="eyebrow">Legal</p>
+      <h1>Privacy Policy</h1>
+      <p>Brocode uses the information you submit to process orders, answer enquiries, and improve the store experience.</p>
+      <h2>What we collect</h2>
+      <p>When connected to the production API, we may collect your name, email, phone number, shipping address, order details, and contact messages. Cart, wishlist, theme, and cookie choices may be stored locally in your browser.</p>
+      <h2>How we use it</h2>
+      <p>We use order and contact information only for fulfilment, support, fraud prevention, and service improvements. We do not store payment card details in this frontend.</p>
+      <h2>Choices and contact</h2>
+      <p>You can decline optional analytics in the cookie banner. For privacy requests, contact hello@brocode.store.</p>
+    </main>
+  );
+}
+
+function Terms() {
+  return (
+    <main className="content-page legal-page">
+      <p className="eyebrow">Legal</p>
+      <h1>Terms and Conditions</h1>
+      <p>By using the Brocode store, you agree to provide accurate checkout information and use the service lawfully.</p>
+      <h2>Orders and payment</h2>
+      <p>Prices, availability, delivery estimates, and payment options are shown at checkout. An order is confirmed only after the production service accepts it.</p>
+      <h2>Products and returns</h2>
+      <p>Product colours may vary slightly by display. Return and exchange terms should be published here before live sales begin.</p>
+      <h2>Updates</h2>
+      <p>Brocode may update these terms as the store, delivery partners, and payment providers change.</p>
     </main>
   );
 }
@@ -390,7 +572,7 @@ function LegacyAdmin() {
 }
 
 function AdminPanel({ catalog, setCatalog, categoryList, setCategoryList, blogList, setBlogList, orderList, setOrderList }) {
-  const [adminAuthed, setAdminAuthed] = useState(localStorage.getItem('brocodeAdmin') === 'true');
+  const [adminAuthed, setAdminAuthed] = useState(Boolean(localStorage.getItem('brocodeAdminToken')));
   const [adminError, setAdminError] = useState('');
   const [active, setActive] = useState('Dashboard');
   const [editingProduct, setEditingProduct] = useState(null);
@@ -409,15 +591,26 @@ function AdminPanel({ catalog, setCatalog, categoryList, setCategoryList, blogLi
   const [categoryName, setCategoryName] = useState('');
   const [blogForm, setBlogForm] = useState({ title: '', tag: 'Style Guide', excerpt: '', image: '' });
 
-  function adminLogin(event) {
+  async function adminLogin(event) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    if (data.get('email') === 'admin@brocode.com' && data.get('password') === 'admin123') {
-      localStorage.setItem('brocodeAdmin', 'true');
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    if (data.website) return;
+    if (!apiBase) {
+      setAdminError('Admin API is not configured for this preview.');
+      return;
+    }
+    try {
+      const response = await fetch(apiUrl('/api/auth/login'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      const result = await response.json();
+      if (!response.ok || result.user?.role !== 'admin') {
+        setAdminError(response.ok ? 'This account does not have owner access.' : result.error || 'Invalid owner credentials.');
+        return;
+      }
+      localStorage.setItem('brocodeAdminToken', result.token);
       setAdminAuthed(true);
       setAdminError('');
-    } else {
-      setAdminError('Invalid owner email or password.');
+    } catch {
+      setAdminError('Admin authentication service is unavailable.');
     }
   }
 
@@ -499,9 +692,10 @@ function AdminPanel({ catalog, setCatalog, categoryList, setCategoryList, blogLi
         <form className="auth-card admin-login" onSubmit={adminLogin}>
           <img src={logoFallback} alt="Brocode" />
           <h1>Owner Login</h1>
-          <p>Demo owner access: admin@brocode.com / admin123</p>
-          <input name="email" type="email" placeholder="Owner email" autoComplete="username" />
-          <input name="password" type="password" placeholder="Password" autoComplete="current-password" />
+          <p>Owner access is verified by the secure Brocode API.</p>
+          <Honeypot />
+          <label>Email<input name="email" type="email" placeholder="Owner email" autoComplete="username" required /></label>
+          <label>Password<input name="password" type="password" placeholder="Password" autoComplete="current-password" minLength="8" required /></label>
           {adminError && <strong className="form-error">{adminError}</strong>}
           <button className="primary large">Login to Admin</button>
         </form>
@@ -517,7 +711,7 @@ function AdminPanel({ catalog, setCatalog, categoryList, setCategoryList, blogLi
       <aside className="admin-nav">
         <img src={logoFallback} alt="Brocode" />
         {navItems.map((item) => <button key={item} className={active === item ? 'active' : ''} onClick={() => setActive(item)}>{item}</button>)}
-        <button className="danger" onClick={() => { localStorage.removeItem('brocodeAdmin'); setAdminAuthed(false); }}>Logout</button>
+        <button className="danger" onClick={() => { localStorage.removeItem('brocodeAdminToken'); setAdminAuthed(false); }}>Logout</button>
       </aside>
       <section className="admin-main">
         <div className="admin-title">
@@ -648,11 +842,14 @@ function App() {
   const [cart, setCart] = useState([]);
   const [wishlist, setWishlist] = useState([]);
   const [dark, setDark] = useState(false);
+  const [cookieConsent, setCookieConsent] = useState(() => localStorage.getItem('brocodeCookieConsent'));
   const [catalog, setCatalog] = useState(seedProducts);
   const [categoryList, setCategoryList] = useState(seedCategories);
   const [blogList, setBlogList] = useState(seedBlogs);
   const [orderList, setOrderList] = useState(seedOrders);
   const selectedProduct = useMemo(() => catalog.find((p) => p.id === selected), [catalog, selected]);
+  usePageSeo(page, selectedProduct);
+  useAnalytics(cookieConsent);
 
   function setSelected(id) {
     setSelectedState(id);
@@ -681,6 +878,8 @@ function App() {
   if (page === 'about') screen = <About />;
   if (page === 'contact') screen = <Contact />;
   if (page === 'blogs') screen = <Blogs blogList={blogList} />;
+  if (page === 'privacy') screen = <PrivacyPolicy />;
+  if (page === 'terms') screen = <Terms />;
   if (page === 'admin') screen = <AdminPanel catalog={catalog} setCatalog={setCatalog} categoryList={categoryList} setCategoryList={setCategoryList} blogList={blogList} setBlogList={setBlogList} orderList={orderList} setOrderList={setOrderList} />;
   if (page === 'wishlist') screen = <Wishlist catalog={catalog} wishlist={wishlist} setSelected={setSelected} addCart={addCart} toggleWish={toggleWish} />;
 
@@ -688,7 +887,11 @@ function App() {
     <div className={dark ? 'app dark' : 'app'}>
       <Header page={page} setPage={setPage} cartCount={cart.reduce((s, i) => s + i.qty, 0)} wishlistCount={wishlist.length} dark={dark} setDark={setDark} />
       {screen}
-      <footer><strong>Brocode</strong><span>Premium clothing store with JWT-ready Flask backend, MySQL schema, analytics, wishlist, reviews, order tracking and recommendations.</span></footer>
+      <footer>
+        <div><strong>Brocode</strong><span>Premium clothing store with JWT-ready Flask backend, MySQL schema, analytics, wishlist, reviews, order tracking and recommendations.</span></div>
+        <div className="footer-links"><button onClick={() => setPage('privacy')}>Privacy Policy</button><button onClick={() => setPage('terms')}>Terms and Conditions</button></div>
+      </footer>
+      {!cookieConsent && <CookieBanner onChoice={(choice) => { localStorage.setItem('brocodeCookieConsent', choice); setCookieConsent(choice); }} />}
     </div>
   );
 }
