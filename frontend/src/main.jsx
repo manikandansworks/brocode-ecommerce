@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './styles.css';
+import logoAsset from './assets/brocode-logo.svg';
 import { products as seedProducts, categories as seedCategories, blogs as seedBlogs, reviews, orders as seedOrders, customers } from './data/storeData';
 
-const logoFallback = '/src/assets/brocode-logo.svg';
+const logoFallback = logoAsset;
 
 function money(value) {
   return `₹${value.toLocaleString('en-IN')}`;
@@ -454,7 +455,7 @@ function AdminPanel({ catalog, setCatalog, categoryList, setCategoryList, blogLi
       newArrival: true,
       bestSeller: false,
       bg: 'linear-gradient(135deg,#111,#c80012)',
-      images: [productForm.image || catalog[0]?.images?.[0] || '/src/assets/brocode-logo.svg']
+      images: [productForm.image || catalog[0]?.images?.[0] || logoFallback]
     };
     setCatalog((items) => editingProduct ? items.map((item) => item.id === editingProduct ? { ...item, ...nextProduct } : item) : [nextProduct, ...items]);
     resetProductForm();
