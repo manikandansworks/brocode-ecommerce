@@ -13,8 +13,17 @@ Full-stack clothing store scaffold with a React customer storefront, owner/admin
 ## Run Frontend
 
 ```powershell
-npm install
-npm run dev
+npm.cmd install
+npm.cmd run dev
+```
+
+Open `http://127.0.0.1:5173/` after Vite starts. On Windows PowerShell, use
+`npm.cmd` when script execution policy blocks `npm.ps1`.
+
+To allow a temporary review tunnel to reach Vite, run the frontend directly:
+
+```powershell
+npm.cmd --prefix frontend run dev -- --host 0.0.0.0
 ```
 
 ## Run Backend
